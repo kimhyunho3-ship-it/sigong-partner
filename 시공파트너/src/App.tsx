@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 import { User, Project, Bid, ChatMessage, Dispute, ProcessType, Region } from "./types";
 import { INITIAL_USERS, INITIAL_PROJECTS, INITIAL_BIDS, INITIAL_CHAT_MESSAGES } from "./data";
 import InteriorPanel from "./components/InteriorPanel";
@@ -73,37 +74,70 @@ export default function App() {
   // 1. 입찰 등록 및 가상 응답 타이머 (역경매 시뮬레이션의 핵심!)
   // -------------------------------------------------------------------
   const handleAddProject = async (newProjData: Omit<Project, "id" | "interiorId" | "interiorName" | "createdAt">) => {
-    // 1. Supabase 실시간 연동 등록 요청
+    // 1. Supabase 실시간 연동 등록 요청 (Vite 클라이언트 환경 변수 우선 활용)
     try {
-      const response = await fetch("/api/construction-sites", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          title: newProjData.title,
-          address: newProjData.address,
-          size: newProjData.area, // 평수 -> size 매핑
-          category: newProjData.process, // 공정 -> category 매핑
-          region: newProjData.region, // 지역 매핑
-          start_date: newProjData.startDate, // 시작일 매핑
-          end_date: newProjData.endDate, // 종료일 매핑
-          description: newProjData.notes, // 특이사항 -> description 매핑
-        }),
-      });
-      const result = await response.json();
-      if (result.success) {
-        if (result.fallback) {
-          console.log("Supabase 미설정 상태 - 로컬 시뮬레이션 작동:", result.message);
-        } else {
-          console.log("Supabase 저장 완료:", result.data);
-          alert(`🎉 Supabase 데이터베이스('construction_sites' 테이블)에 성공적으로 실시간 등록되었습니다!\n\n• 현장명: ${newProjData.title}\n• 주소: ${newProjData.address}\n• 지역: ${newProjData.region}\n• 평수: ${newProjData.area}평\n• 공정: ${newProjData.process}\n• 공사 기간: ${newProjData.startDate} ~ ${newProjData.endDate}\n• 특이사항: ${newProjData.notes}`);
+      const url = (import.meta as any).env.VITE_SUPABASE_URL;
+      const anonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
+
+      if (url && anonKey && !url.includes("your-project") && !anonKey.includes("your-anon-key")) {
+        console.log("Vite 클라이언트 환경 변수를 감지하여 Supabase에 직접 데이터를 저장합니다.");
+        const supabaseClient = createClient(url, anonKey);
+        const { data, error } = await supabaseClient
+          .from("construction_sites")
+          .insert([
+            {
+              title: newProjData.title,
+              address: newProjData.address,
+              size: Number(newProjData.area) || 0, // 평수 -> size 매핑
+              category: newProjData.process, // 공정 -> category 매핑
+              region: newProjData.region, // 지역 매핑
+              start_date: newProjData.startDate, // 시작일 매핑
+              end_date: newProjData.endDate, // 종료일 매핑
+              description: newProjData.notes, // 특이사항 -> description 매핑
+            }
+          ])
+          .select();
+
+        if (error) {
+          throw error;
         }
+
+        console.log("Supabase 클라이언트 직접 저장 완료:", data);
+        alert(`🎉 Supabase 데이터베이스('construction_sites' 테이블)에 성공적으로 직접 실시간 등록되었습니다!\n\n• 현장명: ${newProjData.title}\n• 주소: ${newProjData.address}\n• 지역: ${newProjData.region}\n• 평수: ${newProjData.area}평\n• 공정: ${newProjData.process}\n• 공사 기간: ${newProjData.startDate} ~ ${newProjData.endDate}\n• 특이사항: ${newProjData.notes}`);
       } else {
-        alert(`Supabase 연동 실패: ${result.message}`);
+        // 클라이언트 환경 변수가 설정되어 있지 않으면 백엔드 API 프록시 호출로 대체합니다.
+        console.log("Vite 클라이언트 환경 변수가 감지되지 않아 백엔드 API 프록시 호출을 수행합니다.");
+        const response = await fetch("/api/construction-sites", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            title: newProjData.title,
+            address: newProjData.address,
+            size: newProjData.area, // 평수 -> size 매핑
+            category: newProjData.process, // 공정 -> category 매핑
+            region: newProjData.region, // 지역 매핑
+            start_date: newProjData.startDate, // 시작일 매핑
+            end_date: newProjData.endDate, // 종료일 매핑
+            description: newProjData.notes, // 특이사항 -> description 매핑
+          }),
+        });
+        const result = await response.json();
+        if (result.success) {
+          if (result.fallback) {
+            console.log("Supabase 미설정 상태 - 로컬 시뮬레이션 작동:", result.message);
+          } else {
+            console.log("Supabase 백엔드 프록시 저장 완료:", result.data);
+            alert(`🎉 Supabase 데이터베이스('construction_sites' 테이블)에 백엔드 프록시를 통해 성공적으로 실시간 등록되었습니다!\n\n• 현장명: ${newProjData.title}\n• 주소: ${newProjData.address}\n• 지역: ${newProjData.region}\n• 평수: ${newProjData.area}평\n• 공정: ${newProjData.process}\n• 공사 기간: ${newProjData.startDate} ~ ${newProjData.endDate}\n• 특이사항: ${newProjData.notes}`);
+          }
+        } else {
+          alert(`Supabase 연동 실패: ${result.message}`);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Supabase API 호출 중 오류 발생:", error);
+      alert(`Supabase 연동 과정에서 오류가 발생했습니다: ${error.message || error}`);
     }
 
     const newProject: Project = {
