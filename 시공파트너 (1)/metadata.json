@@ -1,6 +1,0 @@
-{
-  "name": "시공파트너",
-  "description": "인테리어 업체와 전문 시공업자를 연결하는 B2B 역경매(최저가 입찰) 에스크로 안심 플랫폼",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
